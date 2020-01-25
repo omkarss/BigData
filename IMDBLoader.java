@@ -12,6 +12,12 @@ import java.util.zip.GZIPInputStream;
 
 public class IMDBLoader {
 
+    static  String folderToAssignment;
+    static String dbURL;
+    static String pwd;
+    static  String user;
+    static  String pathToIMDBData;
+    static  String maxMem;
 
 
     private Connection con;
@@ -33,13 +39,20 @@ public class IMDBLoader {
 
         public static void main(String[] args) throws ClassNotFoundException, SQLException, IOException {
 
+             folderToAssignment = "IMDB//src//main//java";
+             dbURL = args[0];
+             user = args[1];
+             pwd = args[2];
+             pathToIMDBData = args[3];
+
+
 
             IMDBLoader im = new IMDBLoader();
-            im.createDB();
-            im.createTables();
-            im.getRating();
-            im.createpersonTable();
-            //im.createrelatTables();
+            //im.createDB();
+            //im.createTables();
+            //im.getRating();
+            //im.createpersonTable();
+            im.createrelatTables();
 
 
 
@@ -53,8 +66,7 @@ public class IMDBLoader {
 
             Class.forName("com.mysql.jdbc.Driver");
 
-            con = DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306", "root", "Omkar@1994");
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306",user,pwd);
 
 
              stm = con.createStatement();
@@ -73,40 +85,64 @@ public class IMDBLoader {
 
         }
 
-    private void createrelatTables() {
+    private void createrelatTables() throws SQLException {
 
 
 
-        String principal ="title.principals.tsv.gz";
+        String principal =pathToIMDBData+"//"+"title.principals.tsv.gz";
+
+
+
+
+
+        String regex = "(?<=^..)(.*)";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher_patt_per = null;
+        Matcher matcher_patt_movie = null;
+
+
 
         String actedIn_create_sql = "CREATE TABLE IF NOT EXISTS ActedIn (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL , \n"
+                + "PRIMARY KEY (personId,movieId) ,\n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id), FOREIGN KEY (movieId) REFERENCES movie(id) \n"
                 + ");";
 
         String composedBy_create_sql = "CREATE TABLE IF NOT EXISTS ComposedBy (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL , \n"
+                + "PRIMARY KEY(personId,movieId), \n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id) ,  FOREIGN KEY (movieId) REFERENCES movie(id) \n"
                 + ");";
 
         String directedBy_create_sql = "CREATE TABLE IF NOT EXISTS DirectedBy (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL ,\n"
+                + "PRIMARY KEY(personId,movieId) ,\n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id) ,  FOREIGN KEY (movieId) REFERENCES movie(id) \n"
                 + ");";
 
         String editedBy_create_sql = "CREATE TABLE IF NOT EXISTS EditedBy (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL ,\n"
+                + "PRIMARY KEY(personId,movieId) ,\n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id) ,  FOREIGN KEY (movieId) REFERENCES movie(id) \n"
                 + ");";
 
         String producedBy_create_sql = "CREATE TABLE IF NOT EXISTS ProducedBy (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL , \n"
+                + "PRIMARY KEY(personId,movieId) ,\n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id) ,  FOREIGN KEY (movieId) REFERENCES movie(id) \n"
+
                 + ");";
 
         String writtenBy_create_sql = "CREATE TABLE IF NOT EXISTS WrittenBy (\n"
-                + "    personId char(9) ,\n"
-                + "    movieId text NOT NULL\n"
+                + "    personId int ,\n"
+                + "    movieId int NOT NULL , \n"
+                + "PRIMARY KEY(personId,movieId), \n"
+                +  "FOREIGN KEY (personId) REFERENCES person(id) ,  FOREIGN KEY (movieId) REFERENCES movie(id) \n"
                 + ");";
 
 
@@ -115,9 +151,12 @@ public class IMDBLoader {
             Class.forName("com.mysql.jdbc.Driver");
 
             con = DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306/imdb?rewriteBatchedStatements=true", "root", "Omkar@1994");
+                    dbURL, user, pwd
+            );
 
+            Statement statement = con.createStatement();
 
+            statement.execute("USE  IMDBLoader");
 
             InputStream gzip = new GZIPInputStream(new FileInputStream(principal));
 
@@ -179,12 +218,18 @@ public class IMDBLoader {
             int count_row = 0;
             while((row = br.readLine())!=null){
 
+                String result_per;
+                String result_mov;
+
                 if(count_row++==0)
                     continue;
 
                 String [] data = row.split("\t");
 
                 String prof = data[3];
+
+                matcher_patt_per = pattern.matcher(data[2]);
+                matcher_patt_movie = pattern.matcher(data[0]);
 
 
 
@@ -196,16 +241,23 @@ public class IMDBLoader {
                     continue;
 
                 else {
-                    //System.out.println(prof+""+data[2]+""+data[0]);
-                    if(data[2].length()>9)
-                        continue;
 
-                        pers_work.get(prof).setNString(1, data[2]);
-                        pers_work.get(prof).setNString(2, data[0]);
+                    //System.out.println(count_row++);
+
+                    if(matcher_patt_per.find() && matcher_patt_movie.find()) {
+                         result_per = matcher_patt_per.group(1);
+                        pers_work.get(prof).setInt(1, Integer.parseInt(result_per));
+
+                         result_mov = matcher_patt_movie.group(1);
+                        pers_work.get(prof).setInt(2,  Integer.parseInt(result_mov));
+
                         pers_count.put(prof, pers_count.get(prof) + 1);
                         pers_work.get(prof).addBatch();
 
-
+                    }
+                    else{
+                        continue;
+                    }
 
                     if (pers_count.get(prof) % 50000 == 0) {
                         System.out.println("Here");
@@ -226,20 +278,12 @@ public class IMDBLoader {
             con.commit();
 
 
-
-
-
-
-
         }
         catch (Exception e){
 
 
             System.out.println(e);
         }
-
-
-
 
     }
 
@@ -253,7 +297,7 @@ public class IMDBLoader {
                 + "    deathYear     int"
                 + ");";
 
-        String ratings = "name.basics.tsv.gz";
+        String ratings = pathToIMDBData+"//"+"name.basics.tsv.gz";
         String regex = "(?<=^..)(.*)";
         Pattern pattern = Pattern.compile(regex);
 
@@ -261,10 +305,9 @@ public class IMDBLoader {
             int counter=0;
 
             Class.forName("com.mysql.jdbc.Driver");
-
             con = DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306/?rewriteBatchedStatements=true", "root", "Omkar@1994");
-
+                    dbURL, user, pwd
+            );
 
             Statement statement = con.createStatement();
 
@@ -303,22 +346,12 @@ public class IMDBLoader {
 
                 String[] data = row.split("\t");
 
-                if (data[0].length() > 9)
-                    continue;
-                else {
 
 
 
                     matcher_patt = pattern.matcher(data[0]);
                     if (matcher_patt.find()) {
                          result = matcher_patt.group(1);
-
-
-
-
-
-
-
 
 
                         ps.setInt(1, Integer.parseInt(result));
@@ -342,9 +375,10 @@ public class IMDBLoader {
 
 
                     if (++count % 50000 == 0) {
+                        System.out.println("Here");
                         ps.executeBatch();
                     }
-                }
+
 
                 }
                 System.out.println(counter);
@@ -367,19 +401,18 @@ public class IMDBLoader {
 
         private void getRating() throws SQLException, IOException {
 
-        String ratings = "title.ratings.tsv.gz";
-        String regex = "(?<=^..)(.*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher_patt = null;
+        String ratings = pathToIMDBData+"//"+"title.ratings.tsv.gz";
+            String regex = "(?<=^..)(.*)";
+            Pattern pattern = Pattern.compile(regex);
+            Matcher matcher_patt = null;
 
 
             try {
 
 
-            con = DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306/?rewriteBatchedStatements=true", "root", "Omkar@1994");
-
-
+                con = DriverManager.getConnection(
+                        dbURL, user, pwd
+                );
 
 
             Statement statement = con.createStatement();
@@ -455,7 +488,7 @@ public class IMDBLoader {
 
         HashMap<String,Integer> genre = new HashMap<String,Integer>();
 
-        String movie = "title.basics.tsv.gz";
+        String movie = pathToIMDBData+"//"+"title.basics.tsv.gz";
 
 
         String regex = "(?<=^..)(.*)";
@@ -486,10 +519,9 @@ public class IMDBLoader {
         /* Crete Tables*/
         try {
 
-
-             con = DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306/IMDBLoader?rewriteBatchedStatements=true", "root", "Omkar@1994");
-
+            con = DriverManager.getConnection(
+                    dbURL, user, pwd
+            );
 
 
             Statement statement = con.createStatement();
@@ -527,7 +559,6 @@ public class IMDBLoader {
                 Matcher matcher_patt;
                 String result;
 
-                //  System.out.println(count);
                 if (count == 0) {
                     count = count + 1;
                     continue;
@@ -536,11 +567,10 @@ public class IMDBLoader {
 
                 String[] data = row.split("\t");
 
-                if (data[0].length() > 9)
-                    continue;
-                else
-                    matcher_patt = pattern.matcher(data[0]);
-                    if(matcher_patt.find()) {
+
+                matcher_patt = pattern.matcher(data[0]);
+
+                if(matcher_patt.find()) {
                         result = matcher_patt.group(1);
 
 
@@ -605,12 +635,6 @@ public class IMDBLoader {
 
 
 
-  /*                  if (++count % 50000 == 0) {
-                        System.out.println("Here");
-                        ps.executeBatch();
-                    }
-*/
-
                     if (++count_genre % 50000 == 0) {
                         ps.executeBatch();
                         System.out.println("Here");
@@ -628,20 +652,6 @@ public class IMDBLoader {
             ps2.executeBatch();
             con.commit();
 
-
-
-
-
-           /* Iterator it = genre.entrySet().iterator();
-
-            while (it.hasNext()){
-                Map.Entry mapElement = (Map.Entry)it.next();
-
-                ps.setNString(1, String.valueOf((int)mapElement.getValue()));
-                ps.setNString(2,mapElement.getKey().toString());
-                ps.addBatch();
-
-            }*/
 
 
 
